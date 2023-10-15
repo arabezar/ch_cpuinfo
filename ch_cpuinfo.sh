@@ -1,7 +1,9 @@
 #!/bin/sh
 # Updated 2023.03.05 - By FOXBI
+# Updated 2023.10.13 - By Arabezar
 # htttps://github.com/foxbi/ch_cpuinfo
-ver="4.2.1-r01"
+ver="4.2.1-r01-1"
+temp_file_patch=$(pwd)/cpu_info_patch.txt # text file - web page with Processor Specification - saved from any browser as .txt file; actual for Intel only
 # ==============================================================================
 # Location Check
 # ==============================================================================
@@ -179,32 +181,44 @@ GATHER_FN () {
     then
         if [ "$cpu_series" == "ES" ] || [ "$cpu_series" == "Unkown" ]
         then
-            cpu_detail="<a href='https:\/\/ark.intel.com\/content\/www\/us\/en\/ark.html' target=_blank>find<\/a>"
+            cpu_detail="<a href='https:\/\/ark.intel.com\/content\/www\/us\/en\/ark.html#@Processors' target=_blank>find<\/a>"
         else
             cpu_search="https://ark.intel.com/content/www/us/en/ark/search.html?_charset_=UTF-8&q=$cpu_series"
             temp_file="/tmp/cpu_info_temp_url.txt"
             wget -q -O $temp_file "$cpu_search"
-            url_cnt=`cat $temp_file | grep "FormRedirectUrl" | grep "hidden" | wc -l`
-            if [ "$url_cnt" -gt 0 ]
-            then
-                gen_url=`cat $temp_file | grep "FormRedirectUrl" | grep "hidden" | awk -F"value" '{print $2}' | awk -F\" '{print $2}'`
+            if ! [ -s "$temp_file" ]; then
+                if [ -f "${temp_file_patch}" ]; then
+                    cpu_gen=`cat $temp_file_patch | grep "Products formerly" | awk -F"Products formerly " '{print $2}' | sed "s/<\/a>//g" | sed -z "s/[\n\r]//g"`
+                    gen_url=`cat $temp_file_patch | grep "saved from url" | sed -E "s/^<.*\)//" | sed "s/ -->//"`
+                    [ ! $gen_url ] && gen_url=${cpu_search/&/\\&}
+                    cpu_detail="($cpu_gen) <a href='${gen_url//\//\\\/}' target=_blank>detail<\/a>"
+                else
+                    gen_url=${cpu_search/&/\\&}
+                    cpu_detail="<a href='${gen_url//\//\\\/}' target=_blank>find<\/a>"
+                fi
             else
-                gen_url=`cat $temp_file | grep -wi "$cpu_series" | grep "href" | awk -F"href" '{print $2}' | awk -F\" '{print $2}'`
-                if [ "$cpu_family" == "Pentium" ]
+                url_cnt=`cat $temp_file | grep "FormRedirectUrl" | grep "hidden" | wc -l`
+                if [ "$url_cnt" -gt 0 ]
                 then
-                    chg_series=`echo $cpu_series | awk '{print "\\\-"$1"\\\-"$2"\\\-"}'`
-                    gen_url=`cat $temp_file | grep -i "$chg_series" | grep "href" | awk -F"href" '{print $2}' | awk -F\" '{print $2}' | head -1`
-                    cpu_series="$cpu_series_b"
+                    gen_url=`cat $temp_file | grep "FormRedirectUrl" | grep "hidden" | awk -F"value" '{print $2}' | awk -F\" '{print $2}'`
+                else
+                    gen_url=`cat $temp_file | grep -wi "$cpu_series" | grep "href" | awk -F"href" '{print $2}' | awk -F\" '{print $2}'`
+                    if [ "$cpu_family" == "Pentium" ]
+                    then
+                        chg_series=`echo $cpu_series | awk '{print "\\\-"$1"\\\-"$2"\\\-"}'`
+                        gen_url=`cat $temp_file | grep -i "$chg_series" | grep "href" | awk -F"href" '{print $2}' | awk -F\" '{print $2}' | head -1`
+                        cpu_series="$cpu_series_b"
+                    fi
+                    if [ -z "$gen_url" ]
+                    then
+                        chg_series=`echo $cpu_series | awk '{print "\\\-"$1".*"$2"\\\-"}'`
+                        gen_url=`cat $temp_file | grep -i "$chg_series" | grep "href" | awk -F"href" '{print $2}' | awk -F\" '{print $2}' | head -1`
+                    fi
                 fi
-                if [ -z "$gen_url" ]
-                then
-                    chg_series=`echo $cpu_series | awk '{print "\\\-"$1".*"$2"\\\-"}'`
-                    gen_url=`cat $temp_file | grep -i "$chg_series" | grep "href" | awk -F"href" '{print $2}' | awk -F\" '{print $2}' | head -1`
-                fi
+                cpu_gen=`curl --silent https://ark.intel.com$gen_url | grep "Products formerly" | awk -F"Products formerly " '{print $2}' | sed "s/<\/a>//g"`
+                gen_url=`echo $gen_url | sed "s/\//\\\\\\\\\//g"`
+                cpu_detail="($cpu_gen) <a href='https:\/\/ark.intel.com$gen_url' target=_blank>detail<\/a>"
             fi
-            cpu_gen=`curl --silent https://ark.intel.com$gen_url | grep "Products formerly" | awk -F"Products formerly " '{print $2}' | sed "s/<\/a>//g"`
-            gen_url=`echo $gen_url | sed "s/\//\\\\\\\\\//g"`
-            cpu_detail="($cpu_gen) <a href='https:\/\/ark.intel.com$gen_url' target=_blank>detail<\/a>"
         fi
     elif [ "$cpu_vendor" == "AMD" ]
     then
@@ -790,7 +804,7 @@ WORK_DIR="/usr/syno/synoman/webman/modules/AdminCenter"
 SWORK_DIR="/var/packages/SurveillanceStation/target/ui/modules/System"
 MWORK_DIR="/usr/syno/synoman/mobile/ui"
 BKUP_DIR="/root/Xpenology_backup"
-VER_DIR="/etc.default"
+VER_DIR="/etc.defaults"
 
 if [ "$LC_CHK" == "CUSTOMLANG" ]
 then
