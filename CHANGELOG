@@ -1,5 +1,8 @@
 # Change Log 
 
+4.2.1-r01-1.
+   - Added offline mode for intel CPUs (ch_cpuinfo.sh) 2023.10.13
+
 4.2.1-r01.
    - Update new version (ch_cpuinfo ver 4.2.1-r01) 2023.03.05
 
